@@ -1,0 +1,26 @@
+# Render Blueprint. Optional -- you can configure all of this by hand in the
+# dashboard instead. If you commit it, use Render's "New > Blueprint" flow and
+# it will create the service with these settings already applied.
+#
+# Secrets are intentionally NOT in this file. Set OPENAI_API_KEY,
+# PUSHOVER_USER and PUSHOVER_TOKEN in the dashboard, and add summary.txt and
+# linkedin.txt as secret files.
+services:
+  - type: web
+    name: digital-twin
+    runtime: python
+    plan: free
+    # uv is enabled automatically because uv.lock is in the repo root.
+    buildCommand: uv sync --frozen
+    startCommand: uv run python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
+      - key: MODEL_NAME
+        value: gpt-5.4-mini
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PUSHOVER_USER
+        sync: false
+      - key: PUSHOVER_TOKEN
+        sync: false
