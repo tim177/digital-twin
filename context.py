@@ -23,15 +23,33 @@ HERE = Path(__file__).resolve().parent
 SECRETS_DIR = Path("/etc/secrets")
 
 
-def _read_private(filename: str) -> str | None:
-    """Return the contents of a private file, or None if it isn't anywhere."""
-    for candidate in (SECRETS_DIR / filename, HERE / filename):
+def _candidates(filename: str) -> list[Path]:
+    """Where a private file may live, in priority order."""
+    return [SECRETS_DIR / filename, HERE / filename]
+
+
+def _read_private(filename: str) -> tuple[str, Path] | None:
+    """Return (contents, path) for a private file, or None if it isn't anywhere."""
+    for candidate in _candidates(filename):
         try:
             if candidate.is_file():
-                return candidate.read_text(encoding="utf-8").strip()
+                text = candidate.read_text(encoding="utf-8").strip()
+                if text:
+                    return text, candidate
         except OSError:
             continue
     return None
+
+
+def _missing(filename: str, hint: str = "") -> FileNotFoundError:
+    looked = "\n".join(f"    - {path}" for path in _candidates(filename))
+    return FileNotFoundError(
+        f"\nCould not find '{filename}'. Looked in:\n{looked}\n\n"
+        f"  On Render:  Dashboard -> your service -> Environment -> Secret Files\n"
+        f"              -> Add Secret File, with Filename exactly '{filename}'.\n"
+        f"  Locally:    keep '{filename}' next to app.py (it is gitignored).\n"
+        f"{hint}"
+    )
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
@@ -42,30 +60,34 @@ def extract_pdf_text(pdf_path: Path) -> str:
 
 
 def load_summary() -> str:
-    summary = _read_private("summary.txt")
-    if not summary:
-        raise FileNotFoundError(
-            "summary.txt not found. Keep it next to app.py locally, and add it "
-            "as a Render secret file named 'summary.txt' in production."
-        )
-    return summary
+    found = _read_private("summary.txt")
+    if not found:
+        raise _missing("summary.txt")
+    text, source = found
+    print(f"[context] summary.txt loaded from {source}", flush=True)
+    return text
 
 
 def load_linkedin() -> str:
     # Production: pre-extracted text supplied as a Render secret file.
-    text = _read_private("linkedin.txt")
-    if text:
+    found = _read_private("linkedin.txt")
+    if found:
+        text, source = found
+        print(f"[context] linkedin.txt loaded from {source}", flush=True)
         return text
 
     # Local: parse the PDF straight from disk.
     pdf_path = HERE / "linkedin.pdf"
     if pdf_path.is_file():
+        print(f"[context] linkedin parsed from {pdf_path}", flush=True)
         return extract_pdf_text(pdf_path)
 
-    raise FileNotFoundError(
-        "No LinkedIn profile found. Locally, put linkedin.pdf next to app.py. "
-        "On Render, run `uv run python extract_linkedin.py` and add the output "
-        "as a secret file named 'linkedin.txt'."
+    raise _missing(
+        "linkedin.txt",
+        hint=(
+            "  Generate it:  uv run python extract_linkedin.py\n"
+            "                then paste the output into the Render secret file.\n"
+        ),
     )
 
 

@@ -50,10 +50,19 @@ def chat(message, history):
 if __name__ == "__main__":
     demo = gr.ChatInterface(
         chat,
-        chatbot=gr.Chatbot(show_label=False, height=520, elem_id="dt-chatbot"),
+        chatbot=gr.Chatbot(
+            show_label=False,
+            elem_id="dt-chatbot",
+            # The transcript stretches to fill the viewport; styles.py holds
+            # the min-height floor so it never collapses on short screens.
+            height="100%",
+        ),
         examples=EXAMPLES,
         title="Digital Twin",
         description="Talk to my AI Twin about my career",
+        # Full-height app shell: header on top, transcript flexing to fill,
+        # composer pinned at the bottom.
+        fill_height=True,
     )
 
     demo.launch(

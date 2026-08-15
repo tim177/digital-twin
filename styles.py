@@ -2,19 +2,23 @@
 
 Exports three things consumed by ``app.py``:
 
-    CSS      -> custom stylesheet, pass to ``gr.ChatInterface(css=CSS)``
-    JS       -> on-load script,    pass to ``gr.ChatInterface(js=JS)``
+    CSS      -> custom stylesheet, pass to ``demo.launch(css=CSS)``
+    JS       -> on-load script,    pass to ``demo.launch(js=JS)``
     EXAMPLES -> starter prompts,   pass to ``gr.ChatInterface(examples=EXAMPLES)``
 
-Note: ``css``, ``js`` and ``theme`` are constructor arguments of the
-interface, NOT of ``.launch()``.
+Note: on Gradio 6, ``css``, ``js`` and ``theme`` are arguments of ``launch()``,
+not of the ``ChatInterface`` constructor.
 
 The stylesheet works in two layers:
 
     1. It overrides Gradio's own CSS custom properties, so every built-in
        component (buttons, inputs, blocks) picks up the palette for free.
     2. It adds a small number of structural rules for the pieces Gradio
-       does not expose as variables (bubbles, header, examples, scrollbar).
+       does not expose as variables (bubbles, header, composer, examples).
+
+Layout is a full-height app shell: the header sits at the top, the transcript
+flexes to fill whatever height is left, and the composer stays at the bottom.
+That relies on ``fill_height=True`` on the ChatInterface.
 
 Both light and dark are supported. Gradio puts a ``.dark`` class on an
 ancestor element, and custom properties inherit, so redefining the tokens
@@ -35,51 +39,62 @@ CSS = """
   --dt-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas,
                   monospace;
 
-  --dt-radius-lg: 20px;
+  /* Overall width of the app. This is the knob to turn for a wider or
+     narrower layout -- everything else is relative to it. */
+  --dt-max-width: 1180px;
+
+  --dt-radius-xl: 24px;
+  --dt-radius-lg: 18px;
   --dt-radius-md: 14px;
   --dt-radius-sm: 10px;
 
   --dt-accent: #5b5bd6;
-  --dt-accent-hover: #4f4fc4;
-  --dt-accent-glow: rgba(91, 91, 214, 0.28);
+  --dt-accent-hover: #4b4bc8;
+  --dt-accent-grad: linear-gradient(135deg, #5b5bd6 0%, #9333ea 100%);
+  --dt-accent-glow: rgba(91, 91, 214, 0.22);
 
-  --dt-page: #f6f6fa;
+  --dt-page: #f4f4f8;
+  --dt-panel: rgba(255, 255, 255, 0.86);
   --dt-surface: #ffffff;
-  --dt-surface-alt: #f0f0f6;
-  --dt-border: #e3e3ec;
+  --dt-surface-alt: #f1f1f6;
+  --dt-border: #e2e2ec;
+  --dt-border-soft: rgba(20, 20, 30, 0.06);
   --dt-text: #14141c;
-  --dt-text-muted: #6a6a7c;
+  --dt-text-muted: #66667a;
 
-  --dt-user-bg: linear-gradient(135deg, #5b5bd6 0%, #7d5cf0 100%);
+  --dt-user-bg: linear-gradient(135deg, #5b5bd6 0%, #8b46e6 100%);
   --dt-user-text: #ffffff;
   --dt-bot-bg: #ffffff;
-  --dt-bot-text: #14141c;
+  --dt-bot-text: #1a1a24;
 
   --dt-shadow-sm: 0 1px 2px rgba(16, 16, 29, 0.05);
-  --dt-shadow-md: 0 2px 6px rgba(16, 16, 29, 0.06),
-                  0 12px 32px rgba(16, 16, 29, 0.07);
+  --dt-shadow-md: 0 2px 8px rgba(16, 16, 29, 0.05),
+                  0 14px 40px rgba(16, 16, 29, 0.07);
 }
 
 .dark {
-  --dt-accent: #7b7bf0;
-  --dt-accent-hover: #8d8dfa;
-  --dt-accent-glow: rgba(123, 123, 240, 0.32);
+  --dt-accent: #7f7ff5;
+  --dt-accent-hover: #9292ff;
+  --dt-accent-grad: linear-gradient(135deg, #6d6df0 0%, #a855f7 100%);
+  --dt-accent-glow: rgba(124, 108, 245, 0.30);
 
-  --dt-page: #0c0c12;
-  --dt-surface: #16161f;
-  --dt-surface-alt: #1e1e2a;
-  --dt-border: #2a2a38;
-  --dt-text: #ececf2;
-  --dt-text-muted: #9a9aae;
+  --dt-page: #08080c;
+  --dt-panel: rgba(19, 19, 25, 0.82);
+  --dt-surface: #13131a;
+  --dt-surface-alt: #1c1c26;
+  --dt-border: #272733;
+  --dt-border-soft: rgba(255, 255, 255, 0.06);
+  --dt-text: #f0f0f6;
+  --dt-text-muted: #8f8fa6;
 
-  --dt-user-bg: linear-gradient(135deg, #5b5bd6 0%, #8b5cf6 100%);
+  --dt-user-bg: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
   --dt-user-text: #ffffff;
-  --dt-bot-bg: #1b1b26;
-  --dt-bot-text: #ececf2;
+  --dt-bot-bg: #1a1a24;
+  --dt-bot-text: #e9e9f2;
 
-  --dt-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --dt-shadow-md: 0 2px 6px rgba(0, 0, 0, 0.35),
-                  0 12px 32px rgba(0, 0, 0, 0.45);
+  --dt-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --dt-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4),
+                  0 18px 50px rgba(0, 0, 0, 0.5);
 }
 
 /* ==========================================================================
@@ -92,8 +107,8 @@ CSS = """
   --body-background-fill: transparent;
   --background-fill-primary: var(--dt-surface);
   --background-fill-secondary: var(--dt-surface-alt);
-  --block-background-fill: var(--dt-surface);
-  --block-border-color: var(--dt-border);
+  --block-background-fill: transparent;
+  --block-border-color: transparent;
   --block-label-background-fill: var(--dt-surface-alt);
   --block-title-text-color: var(--dt-text-muted);
   --block-shadow: none;
@@ -127,7 +142,7 @@ CSS = """
   --radius-sm: var(--dt-radius-sm);
   --radius-lg: var(--dt-radius-md);
   --radius-xl: var(--dt-radius-lg);
-  --block-radius: var(--dt-radius-md);
+  --block-radius: var(--dt-radius-lg);
   --input-radius: var(--dt-radius-md);
 
   --font: var(--dt-font);
@@ -138,12 +153,12 @@ CSS = """
    3. Page shell
    ========================================================================== */
 
-body,
-gradio-app {
+html, body, gradio-app {
+  height: 100%;
   background: var(--dt-page) !important;
 }
 
-/* Soft accent glow behind the conversation. */
+/* Two soft colour washes behind the app, fixed so they don't scroll away. */
 gradio-app::before {
   content: "";
   position: fixed;
@@ -151,90 +166,97 @@ gradio-app::before {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(60rem 32rem at 50% -12rem, var(--dt-accent-glow), transparent 70%);
-  opacity: 0.75;
+    radial-gradient(48rem 26rem at 15% -8%, var(--dt-accent-glow), transparent 65%),
+    radial-gradient(42rem 24rem at 88% 4%, rgba(168, 85, 247, 0.14), transparent 62%);
 }
 
 .gradio-container {
   position: relative;
   z-index: 1;
-  max-width: 880px !important;
+  max-width: var(--dt-max-width) !important;
+  width: 100% !important;
   margin: 0 auto !important;
-  padding: 1.5rem 1rem 2rem !important;
+  padding: 1.5rem 1.5rem 1rem !important;
   font-family: var(--dt-font);
   color: var(--dt-text);
 }
 
-/* Gradio's "Use via API / Built with Gradio" strip. */
+/* fill_height=True puts the app in a flex column; let the chat area absorb
+   the leftover space instead of the whole thing scrolling. */
+.gradio-container > .main,
+.gradio-container .contain,
+.gradio-container > .wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 footer,
 .gradio-container footer {
   display: none !important;
 }
 
 /* ==========================================================================
-   4. Header (title + description rendered by ChatInterface)
+   4. Header
    ========================================================================== */
 
 .gradio-container h1 {
-  margin: 0 0 0.35rem !important;
-  font-size: 2rem !important;
+  margin: 0 0 0.3rem !important;
+  font-size: 2.1rem !important;
   font-weight: 700 !important;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.03em;
   text-align: center;
-  background: var(--dt-user-bg);
+  background: var(--dt-accent-grad);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* ChatInterface renders `description` as a paragraph right under the title. */
+/* ChatInterface renders `description` as a paragraph under the title. */
 .gradio-container h1 + div p,
 .gradio-container h1 ~ .prose p:first-child {
-  margin: 0 0 1.25rem !important;
+  margin: 0 auto 1.35rem !important;
   text-align: center;
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   color: var(--dt-text-muted);
 }
 
 /* ==========================================================================
-   5. Chat surface
+   5. Chat panel
    ========================================================================== */
 
-.gradio-container .block,
-.gradio-container .form {
-  border-radius: var(--dt-radius-lg) !important;
-  border-color: var(--dt-border) !important;
-}
-
 #dt-chatbot,
-.chatbot,
 .gradio-container .chatbot {
+  flex: 1 1 auto;
+  min-height: 420px;
   border: 1px solid var(--dt-border) !important;
-  border-radius: var(--dt-radius-lg) !important;
-  background: var(--dt-surface) !important;
+  border-radius: var(--dt-radius-xl) !important;
+  background: var(--dt-panel) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--dt-shadow-md);
   overflow: hidden;
 }
 
 .message-wrap,
 .bubble-wrap {
-  padding: 1.25rem 1rem !important;
-  gap: 0.75rem !important;
+  padding: 1.6rem 1.5rem !important;
+  gap: 1rem !important;
   background: transparent !important;
 }
 
 /* Bubbles. Gradio has shuffled these class names between majors, so match
-   the v4 (`.message.user`) and v5 (`.message-row.user-row`) shapes both. */
+   the older (`.message.user`) and current (`.message-row.user-row`) shapes. */
 .message,
 .message-row .message {
-  max-width: 78% !important;
-  padding: 0.7rem 1rem !important;
+  max-width: 74% !important;
+  padding: 0.85rem 1.15rem !important;
   border: none !important;
-  border-radius: var(--dt-radius-md) !important;
-  font-size: 0.95rem !important;
-  line-height: 1.6 !important;
+  border-radius: var(--dt-radius-lg) !important;
+  font-size: 0.97rem !important;
+  line-height: 1.68 !important;
   box-shadow: var(--dt-shadow-sm);
-  animation: dt-rise 0.28s ease both;
+  animation: dt-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .message.user,
@@ -250,34 +272,58 @@ footer,
 .message-row.bot-row .message {
   background: var(--dt-bot-bg) !important;
   color: var(--dt-bot-text) !important;
-  border: 1px solid var(--dt-border) !important;
+  border: 1px solid var(--dt-border-soft) !important;
   border-bottom-left-radius: var(--dt-radius-sm) !important;
 }
 
-/* Keep links readable on the coloured user bubble. */
+.avatar-container {
+  border: 1px solid var(--dt-border) !important;
+  box-shadow: var(--dt-shadow-sm);
+}
+
+/* Keep links legible on the coloured user bubble. */
 .message.user a,
 .message-row.user-row .message a {
   color: #ffffff;
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-/* Markdown inside a reply. */
+/* ==========================================================================
+   6. Markdown inside a reply
+   ========================================================================== */
+
 .message p:first-child { margin-top: 0 !important; }
 .message p:last-child  { margin-bottom: 0 !important; }
 
+.message h1, .message h2, .message h3 {
+  margin: 1rem 0 0.5rem !important;
+  font-size: 1.05em !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.01em;
+}
+
+.message ul, .message ol {
+  margin: 0.5rem 0 !important;
+  padding-left: 1.3rem !important;
+}
+
+.message li { margin: 0.28rem 0 !important; }
+
 .message code {
-  padding: 0.12em 0.4em;
+  padding: 0.14em 0.42em;
   border-radius: 6px;
   font-family: var(--dt-font-mono);
-  font-size: 0.875em;
+  font-size: 0.87em;
   background: var(--dt-surface-alt);
   color: var(--dt-text);
 }
 
 .message pre {
-  padding: 0.85rem 1rem;
+  margin: 0.7rem 0;
+  padding: 0.95rem 1.1rem;
   border: 1px solid var(--dt-border);
-  border-radius: var(--dt-radius-sm);
+  border-radius: var(--dt-radius-md);
   background: var(--dt-surface-alt) !important;
   overflow-x: auto;
 }
@@ -285,47 +331,82 @@ footer,
 .message pre code {
   padding: 0;
   background: transparent;
+  font-size: 0.86em;
+  line-height: 1.6;
+}
+
+.message blockquote {
+  margin: 0.6rem 0;
+  padding: 0.15rem 0 0.15rem 0.9rem;
+  border-left: 3px solid var(--dt-accent);
+  color: var(--dt-text-muted);
 }
 
 .message table {
   width: 100%;
+  margin: 0.6rem 0;
   border-collapse: collapse;
   font-size: 0.9em;
 }
 
 .message th,
 .message td {
-  padding: 0.4rem 0.6rem;
+  padding: 0.45rem 0.7rem;
   border: 1px solid var(--dt-border);
   text-align: left;
 }
 
+.message th {
+  background: var(--dt-surface-alt);
+  font-weight: 600;
+}
+
 /* ==========================================================================
-   6. Composer
+   7. Composer
    ========================================================================== */
+
+.gradio-container .form,
+.gradio-container .input-container {
+  border: none !important;
+  background: transparent !important;
+}
 
 .gradio-container textarea,
 .gradio-container input[type="text"] {
-  border-radius: var(--dt-radius-md) !important;
+  padding: 0.85rem 1.1rem !important;
+  border: 1px solid var(--dt-border) !important;
+  border-radius: var(--dt-radius-lg) !important;
+  background: var(--dt-surface) !important;
+  box-shadow: var(--dt-shadow-sm) !important;
   font-family: var(--dt-font) !important;
-  font-size: 0.95rem !important;
+  font-size: 0.97rem !important;
+  line-height: 1.55 !important;
   resize: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .gradio-container textarea:focus,
 .gradio-container input[type="text"]:focus {
   outline: none !important;
   border-color: var(--dt-accent) !important;
-  box-shadow: 0 0 0 3px var(--dt-accent-glow) !important;
+  box-shadow: 0 0 0 4px var(--dt-accent-glow) !important;
 }
 
 .gradio-container button {
   border-radius: var(--dt-radius-md) !important;
   font-weight: 550 !important;
-  transition: transform 0.12s ease, filter 0.12s ease, background-color 0.12s ease;
+  transition: transform 0.12s ease, filter 0.12s ease, background 0.15s ease;
 }
 
-.gradio-container button:hover  { filter: brightness(1.05); }
+.gradio-container button.primary,
+.gradio-container button[variant="primary"] {
+  background: var(--dt-accent-grad) !important;
+  border: none !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px var(--dt-accent-glow);
+}
+
+.gradio-container button:hover  { filter: brightness(1.06); }
 .gradio-container button:active { transform: translateY(1px); }
 
 .gradio-container button:focus-visible {
@@ -334,19 +415,21 @@ footer,
 }
 
 /* ==========================================================================
-   7. Example prompts
+   8. Example prompts
    ========================================================================== */
 
 .examples .gallery-item,
 .gradio-dataset .gallery-item,
 button.example {
+  padding: 0.5rem 1rem !important;
   border: 1px solid var(--dt-border) !important;
   border-radius: 999px !important;
-  padding: 0.45rem 0.95rem !important;
   background: var(--dt-surface) !important;
   color: var(--dt-text-muted) !important;
   font-size: 0.875rem !important;
+  white-space: normal !important;
   box-shadow: var(--dt-shadow-sm);
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
 }
 
 .examples .gallery-item:hover,
@@ -354,18 +437,19 @@ button.example {
 button.example:hover {
   border-color: var(--dt-accent) !important;
   color: var(--dt-text) !important;
-  background: var(--dt-surface-alt) !important;
+  background: var(--dt-surface) !important;
+  transform: translateY(-1px);
 }
 
 /* ==========================================================================
-   8. Scrollbar
+   9. Scrollbar
    ========================================================================== */
 
-.gradio-container *::-webkit-scrollbar { width: 9px; height: 9px; }
+.gradio-container *::-webkit-scrollbar { width: 10px; height: 10px; }
 .gradio-container *::-webkit-scrollbar-track { background: transparent; }
 
 .gradio-container *::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   border-radius: 999px;
   background-clip: padding-box;
   background-color: var(--dt-border);
@@ -376,16 +460,16 @@ button.example:hover {
 }
 
 /* ==========================================================================
-   9. Motion + small screens
+   10. Motion + small screens
    ========================================================================== */
 
 @keyframes dt-rise {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: none; }
 }
 
 .dt-ready .gradio-container {
-  animation: dt-rise 0.35s ease both;
+  animation: dt-rise 0.4s ease both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -397,10 +481,16 @@ button.example:hover {
   }
 }
 
+@media (max-width: 900px) {
+  .message, .message-row .message { max-width: 86% !important; }
+}
+
 @media (max-width: 640px) {
-  .gradio-container { padding: 1rem 0.65rem 1.5rem !important; }
-  .gradio-container h1 { font-size: 1.6rem !important; }
-  .message, .message-row .message { max-width: 90% !important; }
+  .gradio-container { padding: 1rem 0.75rem 0.75rem !important; }
+  .gradio-container h1 { font-size: 1.65rem !important; }
+  .message-wrap, .bubble-wrap { padding: 1.1rem 0.9rem !important; }
+  .message, .message-row .message { max-width: 92% !important; }
+  #dt-chatbot, .gradio-container .chatbot { border-radius: var(--dt-radius-lg) !important; }
 }
 """
 
