@@ -13,16 +13,22 @@ The stylesheet works in two layers:
 
     1. It overrides Gradio's own CSS custom properties, so every built-in
        component (buttons, inputs, blocks) picks up the palette for free.
-    2. It adds a small number of structural rules for the pieces Gradio
-       does not expose as variables (bubbles, header, composer, examples).
+    2. It adds targeted rules for the pieces Gradio does not expose as
+       variables, scoped under ``#dt-chatbot`` so they reliably beat Gradio's
+       own Svelte-scoped rules.
 
-Layout is a full-height app shell: the header sits at the top, the transcript
-flexes to fill whatever height is left, and the composer stays at the bottom.
-That relies on ``fill_height=True`` on the ChatInterface.
+Two things this deliberately does NOT do, both learned the hard way:
 
-Both light and dark are supported. Gradio puts a ``.dark`` class on an
-ancestor element, and custom properties inherit, so redefining the tokens
-under ``.dark`` is enough to flip the whole theme.
+    * It never sets a width or max-width on ``.message``. Gradio sizes that
+      element with ``width: 100%`` and constrains the row around it instead;
+      adding a percentage max-width there collapses the bubble to one
+      character wide.
+    * It never forces ``display: flex`` onto Gradio's generic layout wrappers
+      (``.main``, ``.contain``, ``.wrap``). Those class names appear at many
+      nesting levels, and reflowing them pushes the composer off-screen.
+
+Chat height comes from the ``height``/``min_height`` arguments on ``gr.Chatbot``
+in app.py, not from CSS, so the composer always stays in the viewport.
 """
 
 __all__ = ["CSS", "JS", "EXAMPLES"]
@@ -58,7 +64,7 @@ CSS = """
   --dt-surface: #ffffff;
   --dt-surface-alt: #f1f1f6;
   --dt-border: #e2e2ec;
-  --dt-border-soft: rgba(20, 20, 30, 0.06);
+  --dt-border-soft: rgba(20, 20, 30, 0.07);
   --dt-text: #14141c;
   --dt-text-muted: #66667a;
 
@@ -73,8 +79,8 @@ CSS = """
 }
 
 .dark {
-  --dt-accent: #7f7ff5;
-  --dt-accent-hover: #9292ff;
+  --dt-accent: #8b8bf8;
+  --dt-accent-hover: #9d9dff;
   --dt-accent-grad: linear-gradient(135deg, #6d6df0 0%, #a855f7 100%);
   --dt-accent-glow: rgba(124, 108, 245, 0.30);
 
@@ -83,9 +89,9 @@ CSS = """
   --dt-surface: #13131a;
   --dt-surface-alt: #1c1c26;
   --dt-border: #272733;
-  --dt-border-soft: rgba(255, 255, 255, 0.06);
+  --dt-border-soft: rgba(255, 255, 255, 0.07);
   --dt-text: #f0f0f6;
-  --dt-text-muted: #8f8fa6;
+  --dt-text-muted: #9494ab;
 
   --dt-user-bg: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
   --dt-user-text: #ffffff;
@@ -107,19 +113,21 @@ CSS = """
   --body-background-fill: transparent;
   --background-fill-primary: var(--dt-surface);
   --background-fill-secondary: var(--dt-surface-alt);
-  --block-background-fill: transparent;
-  --block-border-color: transparent;
+  --block-background-fill: var(--dt-surface);
+  --block-border-color: var(--dt-border);
   --block-label-background-fill: var(--dt-surface-alt);
   --block-title-text-color: var(--dt-text-muted);
   --block-shadow: none;
 
   --border-color-primary: var(--dt-border);
   --border-color-accent: var(--dt-accent);
+  --border-color-accent-subdued: var(--dt-border);
 
   --body-text-color: var(--dt-text);
   --body-text-color-subdued: var(--dt-text-muted);
   --link-text-color: var(--dt-accent);
   --link-text-color-hover: var(--dt-accent-hover);
+  --color-text-link: var(--dt-accent);
 
   --color-accent: var(--dt-accent);
   --color-accent-soft: var(--dt-surface-alt);
@@ -153,8 +161,7 @@ CSS = """
    3. Page shell
    ========================================================================== */
 
-html, body, gradio-app {
-  height: 100%;
+body, gradio-app {
   background: var(--dt-page) !important;
 }
 
@@ -176,19 +183,9 @@ gradio-app::before {
   max-width: var(--dt-max-width) !important;
   width: 100% !important;
   margin: 0 auto !important;
-  padding: 1.5rem 1.5rem 1rem !important;
+  padding: 1.25rem 1.5rem 1rem !important;
   font-family: var(--dt-font);
   color: var(--dt-text);
-}
-
-/* fill_height=True puts the app in a flex column; let the chat area absorb
-   the leftover space instead of the whole thing scrolling. */
-.gradio-container > .main,
-.gradio-container .contain,
-.gradio-container > .wrap {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
 }
 
 footer,
@@ -198,26 +195,23 @@ footer,
 
 /* ==========================================================================
    4. Header
+   ChatInterface renders the title as an <h1> with inline centering, and the
+   description as its own Markdown block. app.py wraps the description in
+   .dt-subtitle so it can be targeted directly.
    ========================================================================== */
 
 .gradio-container h1 {
-  margin: 0 0 0.3rem !important;
-  font-size: 2.1rem !important;
+  margin: 0 0 0.25rem !important;
+  color: var(--dt-accent) !important;
+  font-size: 2.05rem !important;
   font-weight: 700 !important;
   letter-spacing: -0.03em;
-  text-align: center;
-  background: var(--dt-accent-grad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
-/* ChatInterface renders `description` as a paragraph under the title. */
-.gradio-container h1 + div p,
-.gradio-container h1 ~ .prose p:first-child {
-  margin: 0 auto 1.35rem !important;
+.dt-subtitle {
+  margin: 0 0 1.1rem !important;
   text-align: center;
-  font-size: 0.98rem;
+  font-size: 0.97rem;
   color: var(--dt-text-muted);
 }
 
@@ -225,10 +219,7 @@ footer,
    5. Chat panel
    ========================================================================== */
 
-#dt-chatbot,
-.gradio-container .chatbot {
-  flex: 1 1 auto;
-  min-height: 420px;
+#dt-chatbot {
   border: 1px solid var(--dt-border) !important;
   border-radius: var(--dt-radius-xl) !important;
   background: var(--dt-panel) !important;
@@ -238,142 +229,160 @@ footer,
   overflow: hidden;
 }
 
-.message-wrap,
-.bubble-wrap {
-  padding: 1.6rem 1.5rem !important;
-  gap: 1rem !important;
+#dt-chatbot .bubble-wrap,
+#dt-chatbot .message-wrap {
   background: transparent !important;
 }
 
-/* Bubbles. Gradio has shuffled these class names between majors, so match
-   the older (`.message.user`) and current (`.message-row.user-row`) shapes. */
-.message,
-.message-row .message {
-  max-width: 74% !important;
-  padding: 0.85rem 1.15rem !important;
-  border: none !important;
+/* Bubbles. `.user` / `.bot` sit on the same element as `.message`; the id
+   prefix is what makes these win against Gradio's scoped rules. Appearance
+   only -- Gradio owns the sizing. */
+#dt-chatbot .message.user,
+#dt-chatbot .message.bot {
+  padding: 0.8rem 1.1rem !important;
   border-radius: var(--dt-radius-lg) !important;
   font-size: 0.97rem !important;
   line-height: 1.68 !important;
-  box-shadow: var(--dt-shadow-sm);
+  box-shadow: var(--dt-shadow-sm) !important;
   animation: dt-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.message.user,
-.user > .message,
-.message-row.user-row .message {
+#dt-chatbot .message.user {
   background: var(--dt-user-bg) !important;
+  border: none !important;
   color: var(--dt-user-text) !important;
   border-bottom-right-radius: var(--dt-radius-sm) !important;
 }
 
-.message.bot,
-.bot > .message,
-.message-row.bot-row .message {
+#dt-chatbot .message.bot {
   background: var(--dt-bot-bg) !important;
-  color: var(--dt-bot-text) !important;
   border: 1px solid var(--dt-border-soft) !important;
+  color: var(--dt-bot-text) !important;
   border-bottom-left-radius: var(--dt-radius-sm) !important;
 }
 
-.avatar-container {
-  border: 1px solid var(--dt-border) !important;
+/* Gradio dims assistant prose to 80% by default; full strength reads better
+   against these bubbles. */
+#dt-chatbot .message-wrap .prose.chatbot.md {
+  opacity: 1 !important;
+}
+
+#dt-chatbot .message.user a {
+  color: #ffffff !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+#dt-chatbot .avatar-container {
+  border-color: var(--dt-border) !important;
   box-shadow: var(--dt-shadow-sm);
 }
 
-/* Keep links legible on the coloured user bubble. */
-.message.user a,
-.message-row.user-row .message a {
-  color: #ffffff;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+/* Typing indicator between turns. */
+#dt-chatbot .bubble.pending {
+  border-radius: var(--dt-radius-lg) !important;
+  border-color: var(--dt-border-soft) !important;
+  background: var(--dt-bot-bg) !important;
 }
 
 /* ==========================================================================
    6. Markdown inside a reply
    ========================================================================== */
 
-.message p:first-child { margin-top: 0 !important; }
-.message p:last-child  { margin-bottom: 0 !important; }
+#dt-chatbot .message p:first-child { margin-top: 0 !important; }
+#dt-chatbot .message p:last-child  { margin-bottom: 0 !important; }
 
-.message h1, .message h2, .message h3 {
-  margin: 1rem 0 0.5rem !important;
-  font-size: 1.05em !important;
-  font-weight: 650 !important;
-  letter-spacing: -0.01em;
+#dt-chatbot .message ul,
+#dt-chatbot .message ol {
+  margin: 0.45rem 0 !important;
+  padding-left: 1.25rem !important;
 }
 
-.message ul, .message ol {
-  margin: 0.5rem 0 !important;
-  padding-left: 1.3rem !important;
-}
+#dt-chatbot .message li { margin: 0.25rem 0 !important; }
 
-.message li { margin: 0.28rem 0 !important; }
-
-.message code {
+#dt-chatbot .message code {
   padding: 0.14em 0.42em;
   border-radius: 6px;
   font-family: var(--dt-font-mono);
   font-size: 0.87em;
   background: var(--dt-surface-alt);
-  color: var(--dt-text);
 }
 
-.message pre {
-  margin: 0.7rem 0;
-  padding: 0.95rem 1.1rem;
+#dt-chatbot .message pre {
+  margin: 0.65rem 0;
+  padding: 0.9rem 1.05rem;
   border: 1px solid var(--dt-border);
   border-radius: var(--dt-radius-md);
   background: var(--dt-surface-alt) !important;
   overflow-x: auto;
 }
 
-.message pre code {
+#dt-chatbot .message pre code {
   padding: 0;
   background: transparent;
   font-size: 0.86em;
   line-height: 1.6;
 }
 
-.message blockquote {
-  margin: 0.6rem 0;
-  padding: 0.15rem 0 0.15rem 0.9rem;
+#dt-chatbot .message blockquote {
+  margin: 0.55rem 0;
+  padding: 0.1rem 0 0.1rem 0.85rem;
   border-left: 3px solid var(--dt-accent);
   color: var(--dt-text-muted);
 }
 
-.message table {
+#dt-chatbot .message table {
   width: 100%;
-  margin: 0.6rem 0;
+  margin: 0.55rem 0;
   border-collapse: collapse;
   font-size: 0.9em;
 }
 
-.message th,
-.message td {
-  padding: 0.45rem 0.7rem;
-  border: 1px solid var(--dt-border);
+#dt-chatbot .message th,
+#dt-chatbot .message td {
+  padding: 0.42rem 0.65rem;
   text-align: left;
 }
 
-.message th {
+#dt-chatbot .message th {
   background: var(--dt-surface-alt);
   font-weight: 600;
 }
 
 /* ==========================================================================
-   7. Composer
+   7. Example prompts
+   These render as a card grid inside the empty chatbot, not as chips.
    ========================================================================== */
 
-.gradio-container .form,
-.gradio-container .input-container {
-  border: none !important;
-  background: transparent !important;
+#dt-chatbot .example {
+  padding: 0.9rem 1.05rem !important;
+  border: 1px solid var(--dt-border) !important;
+  border-radius: var(--dt-radius-md) !important;
+  background: var(--dt-surface) !important;
+  color: var(--dt-text-muted) !important;
+  box-shadow: var(--dt-shadow-sm);
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
+
+#dt-chatbot .example:hover {
+  border-color: var(--dt-accent) !important;
+  background: var(--dt-surface) !important;
+  color: var(--dt-text) !important;
+  transform: translateY(-2px);
+}
+
+#dt-chatbot .example-text {
+  font-size: 0.9rem !important;
+  line-height: 1.5;
+}
+
+/* ==========================================================================
+   8. Composer
+   ========================================================================== */
 
 .gradio-container textarea,
 .gradio-container input[type="text"] {
-  padding: 0.85rem 1.1rem !important;
+  padding: 0.8rem 1.05rem !important;
   border: 1px solid var(--dt-border) !important;
   border-radius: var(--dt-radius-lg) !important;
   background: var(--dt-surface) !important;
@@ -381,7 +390,6 @@ footer,
   font-family: var(--dt-font) !important;
   font-size: 0.97rem !important;
   line-height: 1.55 !important;
-  resize: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -395,11 +403,10 @@ footer,
 .gradio-container button {
   border-radius: var(--dt-radius-md) !important;
   font-weight: 550 !important;
-  transition: transform 0.12s ease, filter 0.12s ease, background 0.15s ease;
+  transition: transform 0.12s ease, filter 0.12s ease;
 }
 
-.gradio-container button.primary,
-.gradio-container button[variant="primary"] {
+.gradio-container button.primary {
   background: var(--dt-accent-grad) !important;
   border: none !important;
   color: #ffffff !important;
@@ -412,33 +419,6 @@ footer,
 .gradio-container button:focus-visible {
   outline: 2px solid var(--dt-accent);
   outline-offset: 2px;
-}
-
-/* ==========================================================================
-   8. Example prompts
-   ========================================================================== */
-
-.examples .gallery-item,
-.gradio-dataset .gallery-item,
-button.example {
-  padding: 0.5rem 1rem !important;
-  border: 1px solid var(--dt-border) !important;
-  border-radius: 999px !important;
-  background: var(--dt-surface) !important;
-  color: var(--dt-text-muted) !important;
-  font-size: 0.875rem !important;
-  white-space: normal !important;
-  box-shadow: var(--dt-shadow-sm);
-  transition: border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
-}
-
-.examples .gallery-item:hover,
-.gradio-dataset .gallery-item:hover,
-button.example:hover {
-  border-color: var(--dt-accent) !important;
-  color: var(--dt-text) !important;
-  background: var(--dt-surface) !important;
-  transform: translateY(-1px);
 }
 
 /* ==========================================================================
@@ -481,16 +461,10 @@ button.example:hover {
   }
 }
 
-@media (max-width: 900px) {
-  .message, .message-row .message { max-width: 86% !important; }
-}
-
 @media (max-width: 640px) {
-  .gradio-container { padding: 1rem 0.75rem 0.75rem !important; }
-  .gradio-container h1 { font-size: 1.65rem !important; }
-  .message-wrap, .bubble-wrap { padding: 1.1rem 0.9rem !important; }
-  .message, .message-row .message { max-width: 92% !important; }
-  #dt-chatbot, .gradio-container .chatbot { border-radius: var(--dt-radius-lg) !important; }
+  .gradio-container { padding: 0.9rem 0.7rem 0.7rem !important; }
+  .gradio-container h1 { font-size: 1.6rem !important; }
+  #dt-chatbot { border-radius: var(--dt-radius-lg) !important; }
 }
 """
 

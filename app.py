@@ -53,16 +53,16 @@ if __name__ == "__main__":
         chatbot=gr.Chatbot(
             show_label=False,
             elem_id="dt-chatbot",
-            # The transcript stretches to fill the viewport; styles.py holds
-            # the min-height floor so it never collapses on short screens.
-            height="100%",
+            # Sized in viewport units so the composer below always stays on
+            # screen, with a floor so it stays usable on short windows.
+            height="58vh",
+            min_height=300,
         ),
         examples=EXAMPLES,
         title="Digital Twin",
-        description="Talk to my AI Twin about my career",
-        # Full-height app shell: header on top, transcript flexing to fill,
-        # composer pinned at the bottom.
-        fill_height=True,
+        # Wrapped so styles.py can target the subtitle directly -- Gradio
+        # renders title and description as two separate Markdown blocks.
+        description="<div class='dt-subtitle'>Talk to my AI Twin about my career</div>",
     )
 
     demo.launch(
